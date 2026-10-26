@@ -1,0 +1,19 @@
+# dependências e builds
+node_modules
+.next
+dist
+*.tsbuildinfo
+next-env.d.ts
+
+# segredos: nunca versionar (use os .env.example)
+.env
+**/.env
+!**/.env.example
+
+# arquivos de pacientes (cifrados) e backups ficam fora do repositório
+**/storage/*
+!**/storage/.gitkeep
+backups/
+
+# sistema
+.DS_Store

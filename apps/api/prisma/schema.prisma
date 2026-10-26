@@ -1,0 +1,309 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  DOCTOR
+  PATIENT
+  SECRETARY
+}
+
+/// Papel de um usuário dentro de uma clínica.
+enum OrgRole {
+  OWNER // médico titular: gerencia a equipe
+  DOCTOR
+  SECRETARY
+}
+
+enum ExamType {
+  CT // Tomografia
+  MRI // Ressonância
+  US // Ultrassom
+  OTHER
+}
+
+/// Fluxo herdado do v3: created → finishedupload → paid → locked → done
+enum CaseStatus {
+  CREATED // aguardando envio do DICOM
+  UPLOADED // DICOM enviado, aguardando pagamento
+  PAID // pagamento aprovado, aguardando reconstrução
+  PROCESSING // equipe reconstruindo o 3D
+  READY // 3D disponível
+  CANCELLED
+}
+
+enum Plan {
+  UNILATERAL // um rim
+  BILATERAL // os dois rins
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  CANCELLED
+  REFUNDED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role
+  phone        String?
+  cpf          String?
+  birthDate    DateTime?
+  // médico
+  crm          String?
+  specialty    String?
+  institution  String?
+  active       Boolean  @default(true)
+  /// só contas com e-mail confirmado conseguem entrar
+  emailVerifiedAt DateTime?
+  /// médico só cria casos e recebe vínculos depois de aprovado pelo admin
+  approvedAt      DateTime?
+  /// LGPD: aceite da política de privacidade e do tratamento de dados de saúde
+  consentAt       DateTime?
+  consentVersion  String?
+  deletionRequestedAt DateTime?
+  /// 2FA (TOTP): segredo cifrado com STORAGE_KEY; códigos de recuperação em hash
+  totpSecret      String?
+  totpEnabledAt   DateTime?
+  recoveryCodes   String[] @default([])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  casesAsPatient Case[]       @relation("PatientCases")
+  casesAsDoctor  Case[]       @relation("DoctorCases")
+  casesCreated   Case[]       @relation("CreatedCases")
+  sharedCases    CaseShare[]
+  dicomFiles     DicomFile[]
+  orders         Order[]
+  events         CaseEvent[]
+  sessions       Session[]
+  emailTokens    EmailToken[]
+  accessLogs     AccessLog[]
+  memberships    Membership[]
+
+  @@index([role])
+}
+
+/// Sessão no servidor: o cookie só é válido enquanto esta linha existir (logout/troca de senha a removem).
+model Session {
+  id        String   @id @default(cuid())
+  /// SHA-256 do token opaco entregue ao front; o token em claro nunca é guardado
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Case {
+  id          String     @id @default(cuid())
+  code        Int        @unique @default(autoincrement())
+  title       String
+  description String?
+  examType    ExamType   @default(CT)
+  bodyRegion  String?
+  status      CaseStatus @default(CREATED)
+  plan        Plan       @default(UNILATERAL)
+
+  /// clínica dona do caso; vazio = caso enviado direto ao DocDo pelo paciente
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  patientId   String?
+  patient     User?   @relation("PatientCases", fields: [patientId], references: [id], onDelete: SetNull)
+  doctorId    String?
+  doctor      User?   @relation("DoctorCases", fields: [doctorId], references: [id], onDelete: SetNull)
+  createdById String?
+  createdBy   User?   @relation("CreatedCases", fields: [createdById], references: [id], onDelete: SetNull)
+
+  // galeria pública (dados anonimizados)
+  isPublic          Boolean @default(false)
+  publicTitle       String?
+  publicDescription String?
+  views             Int     @default(0)
+
+  adminNotes String?
+  readyAt    DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  dicomFiles DicomFile[]
+  models     Model3D[]
+  orders     Order[]
+  shares     CaseShare[]
+  events     CaseEvent[]
+  accessLogs AccessLog[]
+
+  @@index([status])
+  @@index([isPublic])
+  @@index([organizationId])
+}
+
+model CaseShare {
+  caseId    String
+  case      Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([caseId, userId])
+}
+
+model DicomFile {
+  id           String   @id @default(cuid())
+  caseId       String
+  case         Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  originalName String
+  storageKey   String
+  size         BigInt
+  mimeType     String?
+  uploadedById String?
+  uploadedBy   User?    @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now())
+
+  @@index([caseId])
+}
+
+/// Cada estrutura anatômica reconstruída (rim, artéria, tumor...)
+model Model3D {
+  id         String   @id @default(cuid())
+  caseId     String
+  case       Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  name       String
+  format     String // stl | obj | ply | glb
+  storageKey String
+  size       BigInt
+  color      String   @default("#d9d9d9")
+  opacity    Float    @default(1)
+  sortOrder  Int      @default(0)
+  volumeMl   Float?
+  createdAt  DateTime @default(now())
+
+  @@index([caseId])
+}
+
+model Order {
+  id        String      @id @default(cuid())
+  caseId    String
+  case      Case        @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan      Plan
+  amount    Decimal     @db.Decimal(10, 2)
+  status    OrderStatus @default(PENDING)
+  method    String?     // pix | cartao | boleto | manual
+  paidAt    DateTime?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([status])
+}
+
+model CaseEvent {
+  id        String   @id @default(cuid())
+  caseId    String
+  case      Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  message   String
+  createdAt DateTime @default(now())
+
+  @@index([caseId])
+}
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?
+  phone     String?
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+enum EmailTokenPurpose {
+  VERIFY // confirmar e-mail no cadastro
+  RESET // redefinir senha
+  INVITE // conta criada por médico/admin: definir senha
+}
+
+/// Token de uso único enviado por e-mail. Guardamos só o hash; o token em claro existe apenas no link.
+model EmailToken {
+  id        String            @id @default(cuid())
+  userId    String
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purpose   EmailTokenPurpose
+  tokenHash String            @unique
+  /// dados pendentes aplicados só após a confirmação (ex.: cadastro sobre conta não verificada)
+  data      Json?
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime          @default(now())
+
+  @@index([userId])
+}
+
+enum AccessAction {
+  VIEW_CASE
+  VIEW_3D
+  DOWNLOAD_DICOM
+}
+
+/// LGPD: quem viu ou baixou cada exame, e quando.
+model AccessLog {
+  id        String       @id @default(cuid())
+  caseId    String
+  case      Case         @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    AccessAction
+  detail    String?
+  ip        String?
+  createdAt DateTime     @default(now())
+
+  @@index([caseId, createdAt])
+}
+
+/// Janela fixa de tentativas, compartilhada entre instâncias.
+model RateLimit {
+  key     String   @id
+  count   Int
+  resetAt DateTime
+}
+
+/// Clínica ou consultório: o tenant do SaaS.
+model Organization {
+  id          String       @id @default(cuid())
+  name        String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  memberships Membership[]
+  cases       Case[]
+}
+
+/// Vínculo de um usuário com uma clínica. A secretária só fica ativa depois de aceitar o convite.
+model Membership {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           OrgRole
+  createdAt      DateTime     @default(now())
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+}

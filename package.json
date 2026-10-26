@@ -1,0 +1,36 @@
+{
+  "name": "docdo",
+  "version": "5.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @docdo/contracts && npm run build -w @docdo/api && npm run build -w @docdo/web",
+    "dev:api": "npm run dev -w @docdo/api",
+    "dev:web": "npm run dev -w @docdo/web",
+    "start:api": "npm run start -w @docdo/api",
+    "start:web": "npm run start -w @docdo/web",
+    "lint": "npm run lint -w @docdo/web && npm run lint -w @docdo/api",
+    "db:up": "docker compose up -d db",
+    "db:migrate": "npm run db:migrate -w @docdo/api",
+    "db:seed": "npm run db:seed -w @docdo/api",
+    "db:app-role": "scripts/db-app-role.sh",
+    "setup": "npm run db:up && npm run build -w @docdo/contracts && npm run db:migrate && npm run db:app-role && npm run db:seed",
+    "test:security": "node tests/e2e/security.mjs",
+    "backup": "scripts/backup.sh",
+    "test:tenancy": "node tests/e2e/tenancy.mjs",
+    "test": "npm run test:security && npm run db:seed && npm run test:tenancy"
+  },
+  "devDependencies": {
+    "playwright-core": "1.49"
+  },
+  "overrides": {
+    "multer": "2.5.0",
+    "@nestjs/swagger": {
+      "js-yaml": "5.5.0"
+    },
+    "@types/three": "0.170.0"
+  }
+}

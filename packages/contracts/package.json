@@ -1,0 +1,19 @@
+{
+  "name": "@docdo/contracts",
+  "version": "5.0.0",
+  "private": true,
+  "description": "Tipos e constantes compartilhados entre a API (NestJS) e o front (Next.js)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.esm.json && node -e \"require('fs').writeFileSync('dist/esm/package.json', '{\\\"type\\\":\\\"module\\\"}')\"",
+    "dev": "tsc -p tsconfig.json --watch"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/esm/index.js",
+      "require": "./dist/index.js"
+    }
+  }
+}

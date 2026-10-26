@@ -1,0 +1,20 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: docdo-v5-db
+    restart: unless-stopped
+    # credenciais vêm do ambiente/.env; os valores padrão servem só para desenvolvimento local
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-docdo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-docdo}
+      POSTGRES_DB: ${POSTGRES_DB:-docdo}
+    ports:
+      - "127.0.0.1:5434:5432" # só localhost; nunca expor o banco na rede
+    volumes:
+      - docdo_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-docdo}"]
+      interval: 5s
+      retries: 10
+volumes:
+  docdo_pg:
