@@ -15,7 +15,7 @@ function contentSecurityPolicy(nonce: string) {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self'",
-    "connect-src 'self'",
+    "connect-src 'self' blob:",
     "worker-src 'self' blob:",
     "frame-src https://www.youtube-nocookie.com",
     "frame-ancestors 'none'",
