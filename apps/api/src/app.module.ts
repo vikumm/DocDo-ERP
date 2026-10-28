@@ -10,6 +10,8 @@ import { PublicController } from "./modules/public/public.controller";
 import { CasesController, DicomController } from "./modules/cases/cases.controller";
 import { CasesService } from "./modules/cases/cases.service";
 import { OrgController } from "./modules/org/org.controller";
+import { SegmentationController } from "./modules/segmentation/segmentation.controller";
+import { SegmentationService } from "./modules/segmentation/segmentation.service";
 import { AdminCasesController, AdminController, AdminModelsController, AdminOrdersController, AdminUsersController } from "./modules/admin/admin.controller";
 
 @Controller("health")
@@ -33,11 +35,13 @@ class HealthController {
     AdminCasesController,
     AdminModelsController,
     AdminUsersController,
+    SegmentationController,
     AdminOrdersController,
   ],
   providers: [
     AuthService,
     CasesService,
+    SegmentationService,
     // ordem: chave do front → sessão e perfis
     { provide: APP_GUARD, useClass: BffKeyGuard },
     { provide: APP_GUARD, useClass: SessionGuard },
