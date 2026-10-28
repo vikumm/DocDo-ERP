@@ -14,6 +14,20 @@ import type { ConvertRequest, ConvertResponse, WorkerVolume } from "./convert-ty
 
 const post = (msg: ConvertResponse) => self.postMessage(msg);
 
+/**
+ * niftiWriteImage({ useCompression: true }) returns UNCOMPRESSED bytes in the
+ * browser — gzip ourselves so staged .nii.gz is a real gzip stream (seg-service
+ * nib.load requires extension and content to agree).
+ */
+async function ensureGzipped(data: Uint8Array): Promise<Uint8Array> {
+  if (data[0] === 0x1f && data[1] === 0x8b) return data;
+  if (typeof CompressionStream === "undefined") {
+    throw new Error("Seu navegador não suporta compactação de arquivos (CompressionStream). Use uma versão mais recente do Chrome, Edge, Firefox ou Safari.");
+  }
+  const gz = await new Response(new Blob([data as BlobPart]).stream().pipeThrough(new CompressionStream("gzip"))).arrayBuffer();
+  return new Uint8Array(gz);
+}
+
 function unzipAsync(data: Uint8Array): Promise<Record<string, Uint8Array>> {
   return new Promise((resolve, reject) =>
     unzip(data, (err, files) => (err ? reject(err) : resolve(files)))
@@ -121,7 +135,7 @@ async function convert(req: ConvertRequest) {
     const meta = seriesMeta.get(uid) ?? { description: uid, modality: null };
     const written = await niftiWriteImage(outputImage as Image, `series.nii`, { useCompression: true, webWorker: false });
     if (!written.couldWrite) throw new Error(`Falha ao converter série ${meta.description}.`);
-    const data = written.serializedImage.data;
+    const data = await ensureGzipped(written.serializedImage.data as Uint8Array<ArrayBuffer>);
     const niiName = `nii-${uid}.nii.gz`;
     await putFile(sessionId, niiName, new Blob([data as BlobPart]), "nifti");
     volumes.push({

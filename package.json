@@ -21,6 +21,7 @@
     "test:security": "node tests/e2e/security.mjs",
     "backup": "scripts/backup.sh",
     "test:tenancy": "node tests/e2e/tenancy.mjs",
+    "test:editor": "node tests/e2e/editor.mjs",
     "test": "npm run test:security && npm run db:seed && npm run test:tenancy"
   },
   "devDependencies": {
