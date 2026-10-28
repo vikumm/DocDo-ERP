@@ -9,10 +9,16 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@cornerstonejs/core": "^5.13.2",
+    "@cornerstonejs/nifti-volume-loader": "^5.13.2",
+    "@cornerstonejs/tools": "^5.13.2",
     "@docdo/contracts": "^5.0.0",
+    "@itk-wasm/dicom": "^7.6.4",
+    "@itk-wasm/image-io": "^1.6.1",
     "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.2",
     "clsx": "^2.1.1",
+    "fflate": "^0.8.3",
     "lucide-react": "^1.61.0",
     "next": "^16.4.3",
     "react": "^19.3.1",
