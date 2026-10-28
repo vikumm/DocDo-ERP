@@ -1,0 +1,69 @@
+# SUPERSEDED 2026-10-28 by Devtron app `docdo-segmentation` (appId 39, CD pipeline 36,
+# release docdo-segmentation-production in ns prod). Do NOT apply this — see deploy/devtron.md.
+# Kept as reference for ports/env/probes.
+# Historic apply: ../infrastructure/infra/kc apply -f apps/segmentation/deploy/k8s.yaml
+# DB secret created out-of-band: kubectl -n docdo create secret generic docdo-seg-db
+#   --from-literal=database_url=postgresql+psycopg://docdo_seg:<pw>@gameguild-pg-rw.gameguild.svc.cluster.local:5432/docdo_seg
+# (CNPG gameguild-pg, fenced role/db docdo_seg — house pattern.)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: docdo-segmentation
+  namespace: docdo
+  labels:
+    app: docdo-segmentation
+spec:
+  replicas: 1  # single worker: queue is consumed one job at a time; scale later = shard claim
+  selector:
+    matchLabels:
+      app: docdo-segmentation
+  template:
+    metadata:
+      labels:
+        app: docdo-segmentation
+    spec:
+      containers:
+        - name: docdo-segmentation
+          # linux/amd64 only (cluster x86 nodes; oracle arm64 tainted)
+          image: registry.gameguild.gg/tolstenko/docdo-segmentation:0.1.1
+          ports:
+            - containerPort: 8000
+          env:
+            - name: SEG_RUNNER
+              value: mock # monai needs bundle download at runtime; switch when models mounted
+            - name: SEG_STORE_DIR
+              value: /data
+            - name: SEG_MODEL_DIR
+              value: /data/models
+          envFrom:
+            - secretRef:
+                name: docdo-seg-db
+          volumeMounts:
+            - name: store
+              mountPath: /data
+          resources:
+            requests: { cpu: 250m, memory: 256Mi }
+            limits: { cpu: "1", memory: 1Gi } # bump (4Gi+) when SEG_RUNNER=monai
+          readinessProbe:
+            httpGet: { path: /health, port: 8000 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /health, port: 8000 }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+      volumes:
+        - name: store
+          emptyDir: {} # ephemeral smoke-test store; swap for PVC (longhorn-replicated) when real volumes land
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: docdo-segmentation
+  namespace: docdo
+spec:
+  selector:
+    app: docdo-segmentation
+  ports:
+    - port: 8000
+      targetPort: 8000
