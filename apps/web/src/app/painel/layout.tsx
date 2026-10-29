@@ -13,6 +13,7 @@ export default async function PanelLayout({ children }: { children: React.ReactN
   const nav: NavItem[] = [
     { href: "/painel", label: role === "PATIENT" ? "Meus casos" : "Casos", icon: "dashboard", exact: true },
     { href: "/painel/casos/novo", label: "Enviar exame", icon: "new" },
+    { href: "/painel/editor", label: "Editor", icon: "editor" },
     ...(clinic ? ([{ href: "/painel/pacientes", label: "Pacientes", icon: "contacts" }, { href: "/painel/equipe", label: "Equipe", icon: "team" }] as NavItem[]) : []),
     { href: "/galeria", label: "Galeria 3D", icon: "gallery" },
     { href: "/painel/perfil", label: "Perfil", icon: "profile" },

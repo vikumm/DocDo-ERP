@@ -17,3 +17,15 @@ backups/
 
 # sistema
 .DS_Store
+
+.omo/
+.playwright-mcp/
+f3-*.txt
+f3-*.png
+f3-*.log
+__pycache__/
+*.egg-info/
+apps/segmentation/qa.db*
+
+# artefatos de teste e2e (screenshots etc)
+tests/e2e/out/

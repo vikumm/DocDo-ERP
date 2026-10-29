@@ -50,33 +50,33 @@ enum OrderStatus {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  name         String
-  email        String   @unique
-  passwordHash String
-  role         Role
-  phone        String?
-  cpf          String?
-  birthDate    DateTime?
+  id                  String    @id @default(cuid())
+  name                String
+  email               String    @unique
+  passwordHash        String
+  role                Role
+  phone               String?
+  cpf                 String?
+  birthDate           DateTime?
   // médico
-  crm          String?
-  specialty    String?
-  institution  String?
-  active       Boolean  @default(true)
+  crm                 String?
+  specialty           String?
+  institution         String?
+  active              Boolean   @default(true)
   /// só contas com e-mail confirmado conseguem entrar
-  emailVerifiedAt DateTime?
+  emailVerifiedAt     DateTime?
   /// médico só cria casos e recebe vínculos depois de aprovado pelo admin
-  approvedAt      DateTime?
+  approvedAt          DateTime?
   /// LGPD: aceite da política de privacidade e do tratamento de dados de saúde
-  consentAt       DateTime?
-  consentVersion  String?
+  consentAt           DateTime?
+  consentVersion      String?
   deletionRequestedAt DateTime?
   /// 2FA (TOTP): segredo cifrado com STORAGE_KEY; códigos de recuperação em hash
-  totpSecret      String?
-  totpEnabledAt   DateTime?
-  recoveryCodes   String[] @default([])
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  totpSecret          String?
+  totpEnabledAt       DateTime?
+  recoveryCodes       String[]  @default([])
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   casesAsPatient Case[]       @relation("PatientCases")
   casesAsDoctor  Case[]       @relation("DoctorCases")
@@ -89,6 +89,7 @@ model User {
   emailTokens    EmailToken[]
   accessLogs     AccessLog[]
   memberships    Membership[]
+  segSessions    SegSession[] @relation("SegSessions")
 
   @@index([role])
 }
@@ -140,12 +141,14 @@ model Case {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
-  dicomFiles DicomFile[]
-  models     Model3D[]
-  orders     Order[]
-  shares     CaseShare[]
-  events     CaseEvent[]
-  accessLogs AccessLog[]
+  dicomFiles   DicomFile[]
+  models       Model3D[]
+  orders       Order[]
+  shares       CaseShare[]
+  events       CaseEvent[]
+  accessLogs   AccessLog[]
+  segSessions  SegSession[]
+  segArtifacts SegArtifact[]
 
   @@index([status])
   @@index([isPublic])
@@ -204,7 +207,7 @@ model Order {
   plan      Plan
   amount    Decimal     @db.Decimal(10, 2)
   status    OrderStatus @default(PENDING)
-  method    String?     // pix | cartao | boleto | manual
+  method    String? // pix | cartao | boleto | manual
   paidAt    DateTime?
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
@@ -284,6 +287,40 @@ model RateLimit {
   resetAt DateTime
 }
 
+/// Sessão do serviço de segmentação: mapeia o id do serviço ao usuário/clínica (RLS).
+model SegSession {
+  id             String        @id // id da sessão no serviço de segmentação (uuid)
+  userId         String
+  user           User          @relation("SegSessions", fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  caseId         String?
+  case           Case?         @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  createdAt      DateTime      @default(now())
+
+  @@index([userId])
+  @@index([organizationId])
+}
+
+enum SegArtifactKind {
+  volume
+  labelmap
+}
+
+/// Artefato salvo de uma sessão de segmentação no caso (armazenamento cifrado).
+model SegArtifact {
+  id         String          @id @default(cuid())
+  caseId     String
+  case       Case            @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  sessionId  String
+  kind       SegArtifactKind
+  storageKey String
+  bytes      BigInt
+  createdAt  DateTime        @default(now())
+
+  @@index([caseId])
+}
+
 /// Clínica ou consultório: o tenant do SaaS.
 model Organization {
   id          String       @id @default(cuid())
@@ -291,6 +328,7 @@ model Organization {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   memberships Membership[]
+  segSessions SegSession[]
   cases       Case[]
 }
 

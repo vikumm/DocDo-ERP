@@ -16,6 +16,7 @@ import {
   UserCog,
   Building2,
   Contact,
+  Scan,
   LogOut,
   Menu,
   X,
@@ -39,6 +40,7 @@ const ICONS: Record<string, LucideIcon> = {
   team: UserCog,
   clinics: Building2,
   contacts: Contact,
+  editor: Scan,
 };
 
 export type NavItem = { href: string; label: string; icon: keyof typeof ICONS; exact?: boolean };
